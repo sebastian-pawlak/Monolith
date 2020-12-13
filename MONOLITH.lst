@@ -1,0 +1,191 @@
+mads 2.0.6 build 58 (28 Jan 17)
+Source: C:\jac\wudsn\Workspace\MONOLITH\MONOLITH.ASM
+     1 				; "Monolith", Atari XL/XE Intro 256B
+     2 				; music by Richard Strauss, "Also sprach Zarathustra"
+     3 				; code by tr1x / Agenda
+     4 				; requirements: original Atari XL/XE 64KB PAL
+     5 				; version: 1.0
+     6 				; release date: 2020-12-12
+     7
+     8 = 00FE			value	equ $00fe
+     9 = 00C2			delta	equ $00c2
+    10 = 00C3			notes	equ $00c3
+    11
+    12 = 0054			rowcrs	equ $0054
+    13 = 0055			colcrs	equ $0055
+    14 = 005A			oldrow	equ $005a
+    15 = 005B			oldcol	equ $005b
+    16 = 026F			gprior	equ $026f
+    17 = 02C0			pcolr0	equ $02c0
+    18 = 02FB			atachr	equ $02fb
+    19 = D000			hposp0	equ $d000
+    20 = D001			hposp1	equ $d001
+    21 = D002			hposp2	equ $d002
+    22 = D00D			grafp0	equ $d00d
+    23 = D200			audf1	equ $d200
+    24 = D201			audc1	equ $d201
+    25 = D20A			random	equ $d20a
+    26 = D40A			wsync	equ $d40a
+    27 = D40B			vcount	equ $d40b
+    28 = EF9C			osgraph	equ $ef9c
+    29 = F9C2			osdraw	equ $f9c2
+    30
+    31
+    32 					org $00ff-$0c
+    33
+    34 FFFF> 00F3-00FE> 13	monwth1	.byte $13
+    35 00F4 03			monwth2	.byte $03
+    36 00F5 36			monrow2	.byte $36
+    37 00F6 50			hillwth	.byte $50
+    38 00F7 2C 36 42 00 90 52 + colors	.byte $2c, $36, $42, $00, $90, $52, $54
+    39 00FE 91			valueva	.byte $91
+    40
+    41
+    42 00FF				org $2000
+    43
+    44 2000-20E3> A9 0F		start	lda #$0f
+    45 2002 20 9C EF			jsr osgraph
+    46
+    47
+    48 					; set color palette
+    49 2005 A0 06			ldy #$06
+    50 2007 B9 F7 00		loopa1	lda colors,y
+    51 200A 99 C0 02			sta pcolr0,y
+    52 200D 8A				txa
+    53 200E 99 0D D0			sta grafp0,y
+    54 2011 88				dey
+    55 2012 10 F3			bpl loopa1
+    56
+    57
+    58 					; draw hill
+    59 2014 A4 F6		loopb1	ldy hillwth
+    60 2016 84 55			sty colcrs
+    61 2018 84 5B			sty oldcol
+    62
+    63 201A A5 FF			lda value+1
+    64 201C 65 C2			adc delta
+    65 201E 85 FF			sta value+1
+    66 2020 A5 FE			lda value+0
+    67 2022 69 00			adc #$00		; accumulate carry flag
+    68 2024 85 FE			sta value+0
+    69
+    70 2026 8D 01 D2			sta audc1		; luckily, it works
+    71
+    72 2029 85 54			sta rowcrs
+    73 202B 48				pha
+    74 202C 20 BC 20			jsr aux2
+    75
+    76 202F A5 F6			lda hillwth
+    77 2031 49 7F			eor #$7f
+    78 2033 69 20			adc #$20
+    79 2035 85 55			sta colcrs
+    80 2037 85 5B			sta oldcol
+    81 					
+    82 2039 68				pla
+    83 203A 85 54			sta rowcrs
+    84 203C 20 BC 20			jsr aux2
+    85
+    86 203F E6 C2			inc delta
+    87 2041 E6 C2			inc delta
+    88
+    89 2043 C6 F6			dec hillwth
+    90 2045 D0 CD			bne loopb1
+    91
+    92
+    93 					; draw monolith
+    94 2047 A9 46			lda #$46
+    95 2049 85 5B			sta oldcol
+    96 204B 85 55			sta colcrs
+    97 204D A9 A6			lda #$a6
+    98 204F 85 54			sta rowcrs
+    99
+   100 2051 A9 36		loopc1	lda #$36
+   101 2053 20 B2 20			jsr aux1
+   102 2056 C6 F3			dec monwth1
+   103 2058 D0 F7			bne loopc1
+   104
+   105 205A EE FB 02			inc atachr
+   106 205D C6 54		loopc2	dec rowcrs
+   107 205F C6 54			dec rowcrs
+   108 2061 E6 F5			inc monrow2
+   109 2063 A5 F5			lda monrow2
+   110 2065 20 B2 20			jsr aux1
+   111 2068 C6 F4			dec monwth2
+   112 206A D0 F1			bne loopc2
+   113
+   114
+   115 					; initialization of positions of stars
+   116 206C 88				dey		; y = 0 before "dey"
+   117 206D AD 0A D2		loopd1	lda random
+   118 2070 99 EA 20			sta starpos,y
+   119 2073 88				dey
+   120 2074 D0 F7			bne loopd1
+   121
+   122 					; push PMG behind graphics
+   123 2076 A0 04			ldy #$04
+   124 2078 8C 6F 02			sty gprior
+   125
+   126 					; starfield
+   127 207B AD 0B D4		loopd2	lda vcount
+   128 					;sta wsync	; not necessary
+   129 207E D0 FB			bne loopd2
+   130 2080 AA				tax		; ldx #$00
+   131 2081 FE EA 20		loopd3	inc starpos,x
+   132 2084 BD EA 20			lda starpos,x	
+   133 2087 A0 02			ldy #$02
+   134 2089 8D 0A D4			sta wsync
+   135 208C 99 00 D0		loopd4	sta hposp0,y
+   136 208F 0A				asl
+   137 2090 88				dey
+   138 2091 10 F9			bpl loopd4
+   139 2093 CA				dex
+   140 2094 E0 37			cpx #$37
+   141 2096 D0 E9			bne loopd3
+   142 2098 8C 00 D0			sty hposp0
+   143 209B 8C 01 D0			sty hposp1
+   144 209E 8C 02 D0			sty hposp2
+   145
+   146 					; play music
+   147 20A1 A5 C3			lda notes
+   148 20A3 4A				lsr
+   149 20A4 4A				lsr
+   150 20A5 4A				lsr
+   151 20A6 4A				lsr
+   152 20A7 A8				tay
+   153 20A8 B9 D7 20			lda music,y
+   154 20AB 8D 00 D2			sta audf1
+   155 20AE E6 C3			inc notes
+   156
+   157 20B0 50 C9			bvc loopd2
+   158
+   159
+   160 20B2 85 5A		aux1	sta oldrow
+   161 20B4 20 C2 F9			jsr osdraw
+   162 20B7 E6 55			inc colcrs
+   163 20B9 E6 5B			inc oldcol
+   164 20BB 60				rts
+   165
+   166
+   167 20BC A9 C0		aux2	lda #$c0
+   168 20BE 85 5A			sta oldrow
+   169 20C0 CA				dex
+   170 20C1 8E FB 02			stx atachr
+   171 20C4 20 C2 F9			jsr osdraw
+   172
+   173 20C7 AD 0A D2			lda random
+   174 20CA 29 0F			and #$0f
+   175 20CC 65 54			adc rowcrs
+   176 20CE 85 54			sta rowcrs
+   177 20D0 EE FB 02			inc atachr
+   178 20D3 20 D8 F1			jsr $f1d8
+   179 20D6 60				rts
+   180
+   181
+   182 					; "Also sprach Zarathustra", Richard Strauss
+   183 20D7 79 79 79 51 51 51 + music	.byte 121, 121, 121, 81, 81, 81, 60, 60, 60, 0, 47, 50, 50
+   184
+   185 					; positions of stars
+   186 = 20EA			starpos	equ *+6
+   187
+   188
+   189 02E0-02E1> 00 20			run start
